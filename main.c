@@ -162,6 +162,14 @@ int main()
         // Se for 'A', vai para a verificação
         else if (key == 'A')
         {
+          int answerLength = strlen(answerBuffer);
+          if (answerLength == 0)
+          {
+            drawTextCentered("Digite a resposta", 7);
+            showDisplay();
+            sleep_ms(1000); // Espera um pouco para o usuário ver
+            continue;       // Volta para esperar mais input
+          }
           currentGameState = CHECK_ANSWER;
         }
         // Se for '*', limpa o buffer
@@ -229,7 +237,26 @@ int main()
       drawTextCentered("Resolva a conta:", questionY);
       drawTextCentered(questionStr, questionY + 16);
       // Desenha a resposta do usuário ao lado da pergunta
-      drawTextCentered(answerBuffer, 48);
+      drawTextCentered(answerBuffer, 40);
+
+      if (len > 0)
+      {
+        // Desenhar instrução para enviar resposta
+        // drawTextCentered("Pressione A", 52);
+
+        // Desenhar instrução para enviar
+        drawText(0, SCREEN_HEIGHT - 20, "A");
+        drawText(0, SCREEN_HEIGHT - 13, "enviar");
+
+        // Desenhar instrução para limpar resposta
+        char _clearStr[32] = "*";
+        int _x = SCREEN_WIDTH - (strlen(_clearStr) * 6) - 2; // Calcula a posição X para alinhar à direita
+        drawText(_x, SCREEN_HEIGHT - 20, _clearStr);
+
+        strcpy(_clearStr, "limpar");
+        _x = SCREEN_WIDTH - (strlen(_clearStr) * 6) - 2; // Recalcula a posição X
+        drawText(_x, SCREEN_HEIGHT - 13, _clearStr);
+      }
       showDisplay();
     }
 
