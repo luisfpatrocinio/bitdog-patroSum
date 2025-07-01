@@ -6,7 +6,10 @@
             "type": "process",
             "isBuildCommand": true,
             "command": "${userHome}/.pico-sdk/ninja/v1.12.1/ninja",
-            "args": ["-C", "${workspaceFolder}/build"],
+            "args": [
+                "-C",
+                "${workspaceFolder}/build"
+            ],
             "group": "build",
             "presentation": {
                 "reveal": "always",
@@ -16,6 +19,24 @@
             "windows": {
                 "command": "${env:USERPROFILE}/.pico-sdk/ninja/v1.12.1/ninja.exe"
             }
+        },
+        {
+            "label": "Enter Bootsel",
+            "type": "process",
+            "command": "${env:HOME}/.pico-sdk/picotool/2.1.0/picotool/picotool",
+            "args": [
+                "reboot",
+                "-f",
+                "-u"
+            ],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated"
+            },
+            "problemMatcher": [],
+            "windows": {
+                "command": "${env:USERPROFILE}/.pico-sdk/picotool/2.1.0/picotool/picotool.exe"
+            },
         },
         {
             "label": "Run Project",
@@ -33,12 +54,15 @@
             "problemMatcher": [],
             "windows": {
                 "command": "${env:USERPROFILE}/.pico-sdk/picotool/2.1.0/picotool/picotool.exe"
-            }
+            },
+            "dependsOn": [
+                "Enter Bootsel"
+            ]
         },
         {
             "label": "Flash",
             "type": "process",
-            "command": "openocd",
+            "command": "${userHome}/.pico-sdk/openocd/0.12.0+dev/openocd.exe",
             "args": [
                 "-s",
                 "${userHome}/.pico-sdk/openocd/0.12.0+dev/scripts",
@@ -51,7 +75,7 @@
             ],
             "problemMatcher": [],
             "windows": {
-                "command": "openocd",
+                "command": "${env:USERPROFILE}/.pico-sdk/openocd/0.12.0+dev/openocd.exe"
             }
         }
     ]

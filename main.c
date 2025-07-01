@@ -1,13 +1,18 @@
 /**
  * @file main.c
- * @brief 4x4 Matrix Keyboard with Buzzer Example for Raspberry Pi Pico
+ * @brief PatroSum: Interactive Addition Game for BitDogLab (RP2040)
  * @author Luis Felipe Patrocinio (https://github.com/luisfpatrocinio/)
  *
- * This program scans a 4x4 matrix keyboard and plays a tone on a buzzer corresponding to the pressed key.
+ * PatroSum is an interactive math game designed for the BitDogLab (RP2040) platform.
+ * The player must solve randomly generated addition problems using a 4x4 matrix keypad.
+ * The game provides visual feedback on a display, audio feedback via a buzzer, and uses colored LEDs to indicate correct or incorrect answers.
  *
- * - Keyboard lines and columns are mapped to GPIO pins.
- * - Each key press triggers a specific frequency.
- * - Uses PWM for buzzer control.
+ * - Random addition questions with numbers up to 999
+ * - User input via 4x4 matrix keypad
+ * - Visual feedback on display (question, answer, result)
+ * - Audio feedback with buzzer (success/error tones)
+ * - RGB LEDs for status indication (correct/incorrect)
+ * - State machine controls game flow
  *
  * @version 0.1
  * @date 07-01-2025
@@ -16,28 +21,18 @@
  * See LICENSE file for full license text.
  * https://github.com/luisfpatrocinio/bitdog-patroLibs/blob/main/LICENSE
  */
+
 #include <stdio.h>
 #include "pico/stdlib.h"
 #include "buzzer.h"
 #include "keypad.h"
 #include "led.h"
+#include "approach.h"
 
 // Display
 #include "display.h"
 #include "text.h"
 #include "draw.h"
-
-#define LED_RED_PIN 13
-
-/**
- * @brief Frequency map for each key in the 4x4 matrix (Hz).
- */
-const int keypad_freq_map[4][4] = {
-    {262, 294, 330, 349},  // C4, D4, E4, F4
-    {392, 440, 494, 523},  // G4, A4, B4, C5
-    {587, 659, 698, 784},  // D5, E5, F5, G5
-    {880, 988, 1047, 1175} // A5, B5, C6, D6
-};
 
 /**
  * @brief Mapa de teclas para o teclado 4x4.
@@ -58,17 +53,18 @@ typedef enum
   WAITING_FOR_INPUT,
   CHECK_ANSWER
 } GameState;
-GameState current_game_state;
+GameState currentGameState;
 
 // Questão atual
 int num1, num2, correctAnswer;
 char questionStr[32];  // "num1 + num 2 = "
 char answerBuffer[10]; // guarda a resposta do jogador
+float questionY = 20;
 
 void generateQuestion()
 {
-  num1 = rand() % 10;
-  num2 = rand() % 10;
+  num1 = rand() % 1000;
+  num2 = rand() % 1000;
   correctAnswer = num1 + num2;
   sprintf(questionStr, "%d + %d = ?", num1, num2);
 }
@@ -106,7 +102,7 @@ void setup()
   srand(time_us_32());
 
   // Define o estado inicial do jogo
-  current_game_state = GENERATE_NEW_QUESTION;
+  currentGameState = GENERATE_NEW_QUESTION;
 
   // Limpa o buffer de resposta inicial
   memset(answerBuffer, 0, sizeof(answerBuffer));
@@ -124,23 +120,32 @@ int main()
 {
   setup();
 
-  blink_led_red(1, 100);
+  clearDisplay();
   playWelcomeTones();
+
+  drawTextCentered("Bem-vindo ao", 0);
+  drawTextCentered("PatroSum", 16);
+  showDisplay();
 
   char str[32] = "";
 
   while (true)
   {
     // Maquina de estados
-    switch (current_game_state)
+    switch (currentGameState)
     {
     case GENERATE_NEW_QUESTION:
       generateQuestion();
       memset(answerBuffer, 0, sizeof(answerBuffer)); // Limpa a resposta anterior
-      current_game_state = WAITING_FOR_INPUT;
+      currentGameState = WAITING_FOR_INPUT;
+      questionY = 20; // Reseta a posição Y da pergunta
       break;
     case WAITING_FOR_INPUT:
     {
+      pulseLed(LED_RED_PIN, 0.20);
+      pulseLed(LED_GREEN_PIN, 0.20);
+      pulseLed(LED_BLUE_PIN, 0.20);
+
       KeyEvent evt = keypadScan();
       if (evt.pressed)
       {
@@ -157,7 +162,7 @@ int main()
         // Se for 'A', vai para a verificação
         else if (key == 'A')
         {
-          current_game_state = CHECK_ANSWER;
+          currentGameState = CHECK_ANSWER;
         }
         // Se for '*', limpa o buffer
         else if (key == '*')
@@ -165,8 +170,9 @@ int main()
           memset(answerBuffer, 0, sizeof(answerBuffer));
           playTone(220, 50); // Beep diferente para limpar
         }
+
         // Aguarda um pouco para evitar leituras múltiplas (debounce)
-        sleep_ms(30);
+        sleep_ms(6);
       }
     }
     break;
@@ -177,6 +183,9 @@ int main()
 
       if (playerAnswer == correctAnswer)
       {
+        setLedBrightness(LED_RED_PIN, 0);     // Desliga o LED vermelho
+        setLedBrightness(LED_GREEN_PIN, 255); // Liga o LED verde
+        setLedBrightness(LED_BLUE_PIN, 0);    // Desliga o LED azul
         drawTextCentered("Correto! :)", 8);
         playTone(523, 150); // C5
         sleep_ms(100);
@@ -186,6 +195,9 @@ int main()
       }
       else
       {
+        setLedBrightness(LED_RED_PIN, 255); // Liga o LED vermelho
+        setLedBrightness(LED_GREEN_PIN, 0); // Desliga o LED verde
+        setLedBrightness(LED_BLUE_PIN, 0);  // Desliga o LED azul
         drawTextCentered("Errado! :(", 0);
         char correct_str[32];
         sprintf(correct_str, "Resp: %d", correctAnswer);
@@ -195,20 +207,29 @@ int main()
       }
       showDisplay();
       sleep_ms(2000); // Pausa para o jogador ver o resultado
-      current_game_state = GENERATE_NEW_QUESTION;
+      currentGameState = GENERATE_NEW_QUESTION;
     }
     break;
     }
 
     // --- Lógica de Desenho na Tela ---
     // Esta parte é executada a cada ciclo, exceto durante a tela de resultado
-    if (current_game_state == WAITING_FOR_INPUT)
+    if (currentGameState == WAITING_FOR_INPUT)
     {
       clearDisplay();
-      drawTextCentered("Resolva a conta:", 0);
-      drawText(0, 16, questionStr);
+
+      // Desenha retangulo no topo
+      int _rectHeight = 4;
+      drawRectangle(0, 0, SCREEN_WIDTH, _rectHeight);
+      drawRectangle(0, SCREEN_HEIGHT - _rectHeight, SCREEN_WIDTH, SCREEN_HEIGHT);
+
+      size_t len = strlen(answerBuffer);
+      float _newQuestionY = len > 0 ? 12.0 : 20.0; // Ajusta a posição Y da pergunta se houver resposta
+      questionY = approach(questionY, _newQuestionY, 1);
+      drawTextCentered("Resolva a conta:", questionY);
+      drawTextCentered(questionStr, questionY + 16);
       // Desenha a resposta do usuário ao lado da pergunta
-      drawText(strlen(questionStr) * 8, 16, answerBuffer);
+      drawTextCentered(answerBuffer, 48);
       showDisplay();
     }
 
